@@ -11,9 +11,14 @@ public class PointService {
 	private final UserPointTable userPointTable;
 
 	public UserPoint chargePoint(Long userId, Long amount) {
+		if(amount <= 0) {
+			throw new InvalidPointAmountException(amount);
+		}
+		UserPoint currentUserPoint = userPointTable.selectById(userId);
+
 		return new UserPoint(
 				userId,
-				amount,
+				currentUserPoint.point() + amount,
 				System.currentTimeMillis()
 		);
 	}
