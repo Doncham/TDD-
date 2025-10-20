@@ -7,7 +7,9 @@ import static org.mockito.Mockito.*;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +31,11 @@ class PointServiceTest {
 	private UserPointTable userPointTable;
 	private final Clock fixedClock =
 		Clock.fixed(Instant.parse("2025-10-20T00:00:00Z"), ZoneId.systemDefault());
+
+	@BeforeEach
+	void setUp() {
+		pointService = new PointService(userPointTable, pointHistoryTable, fixedClock);
+	}
 	// 포인트 충전 성공 테스트
 	@Test
 	void givenValidUserAndPointAmount_whenChargePoint_thenIncreaseUserPoint()
@@ -60,6 +67,25 @@ class PointServiceTest {
 		});
 		assertThat(ex.getMessage()).isEqualTo(InvalidPointAmountException.MESSAGE + chargeAmount);
 	}
+	// 포인트 충전 시 포인트 충전 내역을 기록한다.
+	@Test
+	void givenValidUserAndValidPointAmount_whenChargePoint_thenRecordPointHistory(){
+		// given
+		Long userId = 1L;
+		Long chargeAmount = 2000L;
+		Long currentPoint = 5000L;
+		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		when(userPointTable.selectById(userId)).thenReturn(userPoint);
+		// when
+		pointService.chargePoint(userId, chargeAmount);
+		// then
+		verify(pointHistoryTable).insert(
+				userId,
+				chargeAmount,
+				TransactionType.CHARGE,
+				Instant.now(fixedClock).toEpochMilli()
+		);
+	}
 	// 포인트 사용 테스트
 	@Test
 	void givenValidUserAndAmount_whenUsePoint_thenDecreaseUserPoint(){
@@ -89,6 +115,25 @@ class PointServiceTest {
 			pointService.usePoint(userId, useAmount);
 		});
 		assertThat(ex.getMessage()).isEqualTo(NotEnoughPointException.MESSAGE + currentPoint);
+	}
+	// 포인트 사용 시 포인트 사용 내역을 기록한다.
+	@Test
+	void givenValidUserAndValidAmount_whenUsePoint_thenRecordPointHistory(){
+		// given
+		Long userId = 1L;
+		Long useAmount = 2000L;
+		Long currentPoint = 5000L;
+		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		when(userPointTable.selectById(userId)).thenReturn(userPoint);
+		// when
+		pointService.usePoint(userId, useAmount);
+		// then
+		verify(pointHistoryTable).insert(
+				userId,
+				useAmount,
+				TransactionType.USE,
+				Instant.now(fixedClock).toEpochMilli()
+		);
 	}
 
 	// 포인트 조회 성공 테스트
@@ -120,6 +165,38 @@ class PointServiceTest {
 
 		// then
 		assertThat(result.point()).isEqualTo(0L);
+	}
+	// 특정 유저의 포인트 충전/사용 내역 조회 테스트
+	@Test
+	void givenValidUser_whenGetPointHistories_thenReturnPointHistories(){
+		// given
+		Long userId = 1L;
+		when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(
+				List.of(
+						new PointHistory(1L, userId, 1000L, TransactionType.CHARGE, Instant.now(fixedClock).toEpochMilli()),
+						new PointHistory(2L, userId, 500L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli()),
+						new PointHistory(3L, userId, 200L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli())
+				)
+		);
+
+		// when
+		List<PointHistory> histories = pointService.getPointHistories(userId);
+		// then
+		assertThat(histories).hasSize(3);
+		assertThat(histories)
+			.extracting(
+				PointHistory::id,
+				PointHistory::userId,
+				PointHistory::amount,
+				PointHistory::type,
+				PointHistory::updateMillis
+			)
+			.contains(
+				tuple(1L, userId, 1000L, TransactionType.CHARGE, Instant.now(fixedClock).toEpochMilli()),
+				tuple(2L, userId,  500L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli()),
+				tuple(3L, userId,  200L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli())
+			);
+		verify(pointHistoryTable).selectAllByUserId(userId);
 	}
 
 
