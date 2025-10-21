@@ -2,15 +2,20 @@ package io.hhplus.tdd.point;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import io.hhplus.tdd.point.dto.AmountRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/point")
 @RequiredArgsConstructor
+@Validated // 메서드 파라미터(PathVariable) 검증 활성화
 public class PointController {
 
     private static final Logger log = LoggerFactory.getLogger(PointController.class);
@@ -21,7 +26,7 @@ public class PointController {
      */
     @GetMapping("{id}")
     public UserPoint point(
-            @PathVariable long id
+            @PathVariable @Min(1) long id
     ) {
         return pointService.getPoint(id);
     }
@@ -31,7 +36,7 @@ public class PointController {
      */
     @GetMapping("{id}/histories")
     public List<PointHistory> history(
-            @PathVariable long id
+            @PathVariable @Min(1) long id
     ) {
         return pointService.getPointHistories(id);
     }
@@ -42,7 +47,7 @@ public class PointController {
     @PatchMapping("{id}/charge")
     public UserPoint charge(
             @PathVariable long id,
-            @RequestBody long amount
+            @RequestBody @Valid AmountRequest amount
     ) {
         return pointService.chargePoint(id, amount);
     }
@@ -53,7 +58,7 @@ public class PointController {
     @PatchMapping("{id}/use")
     public UserPoint use(
             @PathVariable long id,
-            @RequestBody long amount
+            @RequestBody @Valid AmountRequest amount
     ) {
         return pointService.usePoint(id, amount);
     }

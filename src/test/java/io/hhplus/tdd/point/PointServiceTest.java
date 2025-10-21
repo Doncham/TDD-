@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.hhplus.tdd.database.PointHistoryTable;
 import io.hhplus.tdd.database.UserPointTable;
+import io.hhplus.tdd.point.dto.AmountRequest;
 import io.hhplus.tdd.point.exception.InvalidPointAmountException;
 import io.hhplus.tdd.point.exception.NotEnoughPointException;
 
@@ -46,8 +47,9 @@ class PointServiceTest {
 		Long currentPoint = 500L;
 		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
+		AmountRequest amountRequest = new AmountRequest(chargeAmount);
 		// when
-		UserPoint updatedUserPoint = pointService.chargePoint(userId, chargeAmount);
+		UserPoint updatedUserPoint = pointService.chargePoint(userId, amountRequest);
 
 		// then
 		assertThat(updatedUserPoint.point()).isEqualTo(currentPoint + chargeAmount);
@@ -61,10 +63,11 @@ class PointServiceTest {
 		// given
 		Long userId = 1L;
 		Long chargeAmount = -1000L;
+		AmountRequest amountRequest = new AmountRequest(chargeAmount);
 
 		// when & then
 		InvalidPointAmountException ex = assertThrows(InvalidPointAmountException.class, () -> {
-			pointService.chargePoint(userId, chargeAmount);
+			pointService.chargePoint(userId, amountRequest);
 		});
 		assertThat(ex.getMessage()).contains("충전 금액");
 		verifyNoInteractions(pointHistoryTable);
@@ -77,9 +80,10 @@ class PointServiceTest {
 		Long chargeAmount = 2000L;
 		Long currentPoint = 5000L;
 		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
+		AmountRequest amountRequest = new AmountRequest(chargeAmount);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
-		pointService.chargePoint(userId, chargeAmount);
+		pointService.chargePoint(userId, amountRequest);
 		// then
 		verify(pointHistoryTable).insert(
 				userId,
@@ -96,9 +100,10 @@ class PointServiceTest {
 		Long useAmount = 5000L;
 		Long currentPoint = 5000L;
 		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
+		AmountRequest amountRequest = new AmountRequest(useAmount);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
-		UserPoint updatedUserPoint = pointService.usePoint(userId, useAmount);
+		UserPoint updatedUserPoint = pointService.usePoint(userId, amountRequest);
 		// then
 		assertThat(updatedUserPoint.point()).isEqualTo(currentPoint - useAmount);
 		verify(userPointTable).insertOrUpdate(userId, currentPoint - useAmount);
@@ -112,10 +117,11 @@ class PointServiceTest {
 		Long useAmount = 5001L;
 		Long currentPoint = 5000L;
 		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
+		AmountRequest amountRequest = new AmountRequest(useAmount);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when + then
 		NotEnoughPointException ex = assertThrows(NotEnoughPointException.class, () -> {
-			pointService.usePoint(userId, useAmount);
+			pointService.usePoint(userId, amountRequest);
 		});
 		assertThat(ex.getMessage()).contains("포인트가 부족");
 		verifyNoInteractions(pointHistoryTable);
@@ -128,9 +134,10 @@ class PointServiceTest {
 		Long useAmount = 2000L;
 		Long currentPoint = 5000L;
 		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
+		AmountRequest amountRequest = new AmountRequest(useAmount);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
-		pointService.usePoint(userId, useAmount);
+		pointService.usePoint(userId, amountRequest);
 		// then
 		verify(pointHistoryTable).insert(
 				userId,
