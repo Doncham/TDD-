@@ -19,7 +19,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
-class ApiControllerAdvice extends ResponseEntityExceptionHandler {
+public class ApiControllerAdvice {
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
         return ResponseEntity.status(500).body(new ErrorResponse(
