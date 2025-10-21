@@ -12,7 +12,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,7 +22,7 @@ import io.hhplus.tdd.point.exception.NotEnoughPointException;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
-	@InjectMocks
+	@Mock
 	private PointService pointService;
 	@Mock
 	private PointHistoryTable pointHistoryTable;
@@ -31,6 +30,7 @@ class PointServiceTest {
 	private UserPointTable userPointTable;
 	private final Clock fixedClock =
 		Clock.fixed(Instant.parse("2025-10-20T00:00:00Z"), ZoneId.systemDefault());
+	long now = Instant.now(fixedClock).toEpochMilli();
 
 	@BeforeEach
 	void setUp() {
@@ -44,13 +44,14 @@ class PointServiceTest {
 		Long userId = 1L;
 		Long chargeAmount = 1000L;
 		Long currentPoint = 500L;
-		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
 		UserPoint updatedUserPoint = pointService.chargePoint(userId, chargeAmount);
 
 		// then
 		assertThat(updatedUserPoint.point()).isEqualTo(currentPoint + chargeAmount);
+		verify(userPointTable).insertOrUpdate(userId, currentPoint + chargeAmount);
 	}
 
 	// 포인트 충전 음수 방지 테스트
@@ -65,7 +66,8 @@ class PointServiceTest {
 		InvalidPointAmountException ex = assertThrows(InvalidPointAmountException.class, () -> {
 			pointService.chargePoint(userId, chargeAmount);
 		});
-		assertThat(ex.getMessage()).isEqualTo(InvalidPointAmountException.MESSAGE + chargeAmount);
+		assertThat(ex.getMessage()).contains("충전 금액");
+		verifyNoInteractions(pointHistoryTable);
 	}
 	// 포인트 충전 시 포인트 충전 내역을 기록한다.
 	@Test
@@ -74,7 +76,7 @@ class PointServiceTest {
 		Long userId = 1L;
 		Long chargeAmount = 2000L;
 		Long currentPoint = 5000L;
-		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
 		pointService.chargePoint(userId, chargeAmount);
@@ -83,7 +85,7 @@ class PointServiceTest {
 				userId,
 				chargeAmount,
 				TransactionType.CHARGE,
-				Instant.now(fixedClock).toEpochMilli()
+				now
 		);
 	}
 	// 포인트 사용 테스트
@@ -91,14 +93,15 @@ class PointServiceTest {
 	void givenValidUserAndAmount_whenUsePoint_thenDecreaseUserPoint(){
 		// given
 		Long userId = 1L;
-		Long useAmount = 1000L;
+		Long useAmount = 5000L;
 		Long currentPoint = 5000L;
-		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
 		UserPoint updatedUserPoint = pointService.usePoint(userId, useAmount);
 		// then
 		assertThat(updatedUserPoint.point()).isEqualTo(currentPoint - useAmount);
+		verify(userPointTable).insertOrUpdate(userId, currentPoint - useAmount);
 	}
 
 	// 포인트 사용 테스트 - 잔액 부족
@@ -108,13 +111,14 @@ class PointServiceTest {
 		Long userId = 1L;
 		Long useAmount = 5001L;
 		Long currentPoint = 5000L;
-		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when + then
 		NotEnoughPointException ex = assertThrows(NotEnoughPointException.class, () -> {
 			pointService.usePoint(userId, useAmount);
 		});
-		assertThat(ex.getMessage()).isEqualTo(NotEnoughPointException.MESSAGE + currentPoint);
+		assertThat(ex.getMessage()).contains("포인트가 부족");
+		verifyNoInteractions(pointHistoryTable);
 	}
 	// 포인트 사용 시 포인트 사용 내역을 기록한다.
 	@Test
@@ -123,7 +127,7 @@ class PointServiceTest {
 		Long userId = 1L;
 		Long useAmount = 2000L;
 		Long currentPoint = 5000L;
-		UserPoint userPoint = new UserPoint(userId, currentPoint, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, currentPoint, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
 		pointService.usePoint(userId, useAmount);
@@ -132,7 +136,7 @@ class PointServiceTest {
 				userId,
 				useAmount,
 				TransactionType.USE,
-				Instant.now(fixedClock).toEpochMilli()
+				now
 		);
 	}
 
@@ -142,13 +146,10 @@ class PointServiceTest {
 		// given
 		Long userId = 1L;
 		// 이 부분은 재현이 안되니까 따로 Clock을 만들어야지
-		UserPoint userPoint = new UserPoint(userId, 5000L, Instant.now(fixedClock).toEpochMilli());
+		UserPoint userPoint = new UserPoint(userId, 5000L, now);
 		when(userPointTable.selectById(userId)).thenReturn(userPoint);
 		// when
-		// 이 메서드에서 포인트를 조회해서 UserPoint를 반환하겠지
-		// 없는 경우에 대해서도 테스트 해야 함
 		UserPoint result = pointService.getPoint(userId);
-
 		// then
 		assertThat(result.point()).isEqualTo(userPoint.point());
 	}
@@ -168,14 +169,14 @@ class PointServiceTest {
 	}
 	// 특정 유저의 포인트 충전/사용 내역 조회 테스트
 	@Test
-	void givenValidUser_whenGetPointHistories_thenReturnPointHistories(){
+	void givenValidUser_whenGetPointHistories_thenReturnPointHistories() {
 		// given
 		Long userId = 1L;
 		when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(
 				List.of(
-						new PointHistory(1L, userId, 1000L, TransactionType.CHARGE, Instant.now(fixedClock).toEpochMilli()),
-						new PointHistory(2L, userId, 500L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli()),
-						new PointHistory(3L, userId, 200L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli())
+						new PointHistory(1L, userId, 1000L, TransactionType.CHARGE, now),
+						new PointHistory(2L, userId, 500L, TransactionType.USE, now),
+						new PointHistory(3L, userId, 200L, TransactionType.USE, now)
 				)
 		);
 
@@ -192,13 +193,10 @@ class PointServiceTest {
 				PointHistory::updateMillis
 			)
 			.contains(
-				tuple(1L, userId, 1000L, TransactionType.CHARGE, Instant.now(fixedClock).toEpochMilli()),
-				tuple(2L, userId,  500L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli()),
-				tuple(3L, userId,  200L, TransactionType.USE, Instant.now(fixedClock).toEpochMilli())
+				tuple(1L, userId, 1000L, TransactionType.CHARGE, now),
+				tuple(2L, userId,  500L, TransactionType.USE, now),
+				tuple(3L, userId,  200L, TransactionType.USE, now)
 			);
 		verify(pointHistoryTable).selectAllByUserId(userId);
 	}
-
-
-
 }

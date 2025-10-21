@@ -18,7 +18,7 @@ public class PointService {
 	private final UserPointTable userPointTable;
 	private final PointHistoryTable pointHistoryTable;
 	private final Clock clock;
-
+	// 충전하고 업데이트를 해야하는구나(이걸 왜 생각을 못 했지...)
 	public UserPoint chargePoint(Long userId, Long amount) {
 		if(amount <= 0) {
 			throw new InvalidPointAmountException(amount);
@@ -26,17 +26,18 @@ public class PointService {
 		UserPoint currentUserPoint = userPointTable.selectById(userId);
 		long now = Instant.now(clock).toEpochMilli();
 		pointHistoryTable.insert(userId, amount, TransactionType.CHARGE, now);
+		userPointTable.insertOrUpdate(userId, currentUserPoint.point() + amount);
 		return new UserPoint(
 				userId,
 				currentUserPoint.point() + amount,
-				System.currentTimeMillis()
+				now
 		);
 	}
 
 	public UserPoint getPoint(Long userId) {
 		return userPointTable.selectById(userId);
 	}
-
+	// 이것도 포인트 차감 업데이트 안했네
 	public UserPoint usePoint(Long userId, Long useAmount) {
 		UserPoint userPoint = userPointTable.selectById(userId);
 		if(userPoint.point() < useAmount){
@@ -44,10 +45,11 @@ public class PointService {
 		}
 		long now = Instant.now(clock).toEpochMilli();
 		pointHistoryTable.insert(userId, useAmount, TransactionType.USE, now);
+		userPointTable.insertOrUpdate(userId, userPoint.point() - useAmount);
 		return new UserPoint(
 				userId,
 				userPoint.point() - useAmount,
-				System.currentTimeMillis()
+				now
 		);
 	}
 
