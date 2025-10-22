@@ -21,7 +21,7 @@ import io.hhplus.tdd.point.exception.NotEnoughPointException;
 
 @WebMvcTest(PointController.class)
 @Import(ApiControllerAdvice.class)
-class PointControllerTest {
+class PointControllerUnitTest {
 	@Autowired
 	MockMvc mvc;
 	@Autowired

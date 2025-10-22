@@ -25,10 +25,12 @@ public class PointService {
 		if(amount <= 0) {
 			throw new InvalidPointAmountException(amount);
 		}
+		// 임계 영역 시작
 		UserPoint currentUserPoint = userPointTable.selectById(userId);
 		long now = Instant.now(clock).toEpochMilli();
 		pointHistoryTable.insert(userId, amount, TransactionType.CHARGE, now);
 		userPointTable.insertOrUpdate(userId, currentUserPoint.point() + amount);
+		// 임계 영역 끝
 		return new UserPoint(
 				userId,
 				currentUserPoint.point() + amount,
@@ -42,6 +44,7 @@ public class PointService {
 	// 이것도 포인트 차감 업데이트 안했네
 	public UserPoint usePoint(Long userId, AmountRequest amountRequest) {
 		Long useAmount = amountRequest.getAmount();
+		// 임계 영역 시작
 		UserPoint userPoint = userPointTable.selectById(userId);
 		if(userPoint.point() < useAmount){
 			throw new NotEnoughPointException(userPoint.point());
@@ -49,6 +52,7 @@ public class PointService {
 		long now = Instant.now(clock).toEpochMilli();
 		pointHistoryTable.insert(userId, useAmount, TransactionType.USE, now);
 		userPointTable.insertOrUpdate(userId, userPoint.point() - useAmount);
+		// 임계 영역 끝
 		return new UserPoint(
 				userId,
 				userPoint.point() - useAmount,
