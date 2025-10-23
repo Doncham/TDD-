@@ -20,7 +20,7 @@ public class PointService {
 	private final PointHistoryTable pointHistoryTable;
 	private final Clock clock;
 	// 충전하고 업데이트를 해야하는구나(이걸 왜 생각을 못 했지...)
-	public UserPoint chargePoint(Long userId, AmountRequest requestAmount) {
+	public synchronized UserPoint chargePoint(Long userId, AmountRequest requestAmount) {
 		Long amount = requestAmount.getAmount();
 		if(amount <= 0) {
 			throw new InvalidPointAmountException(amount);
@@ -38,11 +38,11 @@ public class PointService {
 		);
 	}
 
-	public UserPoint getPoint(Long userId) {
+	public synchronized UserPoint getPoint(Long userId) {
 		return userPointTable.selectById(userId);
 	}
 	// 이것도 포인트 차감 업데이트 안했네
-	public UserPoint usePoint(Long userId, AmountRequest amountRequest) {
+	public synchronized UserPoint usePoint(Long userId, AmountRequest amountRequest) {
 		Long useAmount = amountRequest.getAmount();
 		// 임계 영역 시작
 		UserPoint userPoint = userPointTable.selectById(userId);

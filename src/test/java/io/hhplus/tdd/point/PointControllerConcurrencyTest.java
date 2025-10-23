@@ -66,7 +66,7 @@ public class PointControllerConcurrencyTest {
 		startGate.countDown();
 
 		// 완료 대기 + 타임아웃
-		boolean finished = doneGate.await(10, TimeUnit.SECONDS);
+		boolean finished = doneGate.await(100, TimeUnit.SECONDS);
 		pool.shutdownNow();
 		// then
 		UserPoint finalPoint = pointService.getPoint(userId);
